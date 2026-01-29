@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-// --- One Robotix Service App (Client Side) ---
-// גרסה סופית ומתוקנת (30/01/2026):
-// - תיקון תצוגה: שם לקוח + פסיק + סניף ברשימת הדוחות
-// - ללא אקסל, ללא לוגו בסרגל, ללא חתימות
-// - שינויי ניסוח (מטמיע, סניף, דגם)
-// - ייבוא וייצוא לגוגל שיטס (JSONP/Hidden Form)
+// --- One Robotix Service App ---
+// גרסה סופית למובייל ופרודקשן
+// כולל: איפוס הגדרות, תמיכה מלאה בנייד, ועיצוב יציב
 
-// --- ICONS (SVG Embeds) ---
+// --- ICONS (SVG) ---
 const Icons = {
+  Logo: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>,
   Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
   Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
   DownloadCloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>,
@@ -34,68 +32,48 @@ const Icons = {
 };
 
 export default function App() {
-  // --- State Management ---
+  // --- State ---
   const [view, setView] = useState('list'); 
+  const [reports, setReports] = useState([]);
   
-  const [reports, setReports] = useState(() => {
-    const savedReports = localStorage.getItem('serviceReports');
-    return savedReports ? JSON.parse(savedReports) : [];
-  });
+  // URL settings - defaulting to your script
+  const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpCjIMK4ylHrwF5XnpmjJoTF9gQpu2ELjpCFPA8KzUFbQxUVXX2oZl3wjxyHyvtvx4/exec';
   
-  // Settings
   const [settings, setSettings] = useState(() => {
-    const savedSettings = localStorage.getItem('appSettings');
-    const targetUrl = 'https://script.google.com/macros/s/AKfycbzpCjIMK4ylHrwF5XnpmjJoTF9gQpu2ELjpCFPA8KzUFbQxUVXX2oZl3wjxyHyvtvx4/exec';
-    
-    if (savedSettings) {
-        const parsed = JSON.parse(savedSettings);
-        // Normalize URL to prevent markdown paste issues
-        const normalizeScriptUrl = (raw) => {
-            const s = (raw || '').trim();
-            const m = s.match(/\((https?:\/\/[^)]+)\)/);
-            if (m?.[1]) return m[1].trim();
-            return s.replace(/^\[|\]$/g, '').trim();
-        };
-
-        const currentNormalized = normalizeScriptUrl(parsed.googleScriptUrl);
-        // Force update if URL is empty or malformed/old
-        if (!currentNormalized || currentNormalized !== targetUrl) {
-            return { ...parsed, googleScriptUrl: targetUrl };
-        }
-        return parsed;
+    const saved = localStorage.getItem('appSettings');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            // Auto-update to correct URL if needed
+            if (parsed.googleScriptUrl !== DEFAULT_SCRIPT_URL) {
+                 return { ...parsed, googleScriptUrl: DEFAULT_SCRIPT_URL };
+            }
+            return parsed;
+        } catch(e) {}
     }
-    return { googleScriptUrl: targetUrl, autoSync: true, debugMode: false };
+    return { googleScriptUrl: DEFAULT_SCRIPT_URL, autoSync: true, debugMode: false };
   });
 
   const [currentReport, setCurrentReport] = useState(null);
   const [syncStatus, setSyncStatus] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // ID of report to delete
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const formRef = useRef(null);
   const [formDataForSync, setFormDataForSync] = useState(null);
 
-  // --- Helpers ---
-  const getCurrentTime = () => {
-    const now = new Date();
-    return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
   // --- Effects ---
-  useEffect(() => {
-    localStorage.setItem('serviceReports', JSON.stringify(reports));
-  }, [reports]);
-
   useEffect(() => {
     localStorage.setItem('appSettings', JSON.stringify(settings));
   }, [settings]);
 
-  // Load data from Sheet on startup!
+  // Initial Load
   useEffect(() => {
     if (settings.googleScriptUrl && settings.autoSync) {
         importFromGoogleSheets();
     }
   }, []);
 
+  // Hidden Form Submit
   useEffect(() => {
       if (formDataForSync && formRef.current) {
           formRef.current.submit();
@@ -104,17 +82,29 @@ export default function App() {
             setTimeout(() => {
                 setSyncStatus(null);
                 setFormDataForSync(null);
-                // If not deleting, refresh the list after a delay
                 if (formDataForSync.action !== 'delete') {
-                    setTimeout(importFromGoogleSheets, 2000); 
+                    setTimeout(importFromGoogleSheets, 2500); 
                 }
             }, 2000);
           }
       }
   }, [formDataForSync, settings.debugMode]);
 
-  // --- Google Sheets Logic: SYNC (Upsert) & DELETE ---
-  
+  // --- Helpers ---
+  const getCurrentTime = () => {
+    const now = new Date();
+    return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const hardReset = () => {
+      if(confirm('פעולה זו תאפס את הגדרות האפליקציה ותנסה להתחבר מחדש. להמשיך?')) {
+          localStorage.removeItem('appSettings');
+          localStorage.removeItem('serviceReports');
+          window.location.reload();
+      }
+  };
+
+  // --- Logic ---
   const syncToGoogleSheets = (reportData, action = 'upsert') => {
     if (!settings.googleScriptUrl) return;
     setSyncStatus('loading');
@@ -140,7 +130,7 @@ export default function App() {
     });
   };
 
-  // 2. Read (Import) using JSONP
+  // Import using JSONP (Fixes CORS on mobile/preview)
   const importFromGoogleSheets = async () => {
     if (!settings.googleScriptUrl) return;
     setSyncStatus('import-loading');
@@ -148,22 +138,34 @@ export default function App() {
     const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
     const script = document.createElement('script');
     
+    // Increased timeout for mobile networks
+    const timeoutId = setTimeout(() => {
+         if(window[callbackName]) {
+             delete window[callbackName];
+             if(document.body.contains(script)) document.body.removeChild(script);
+             setSyncStatus('import-error');
+             setTimeout(() => setSyncStatus(null), 4000);
+         }
+    }, 15000);
+
     window[callbackName] = (data) => {
+        clearTimeout(timeoutId);
         delete window[callbackName];
-        document.body.removeChild(script);
+        if(document.body.contains(script)) document.body.removeChild(script);
         
         if (Array.isArray(data)) {
             const incomingReports = data.map(parseSheetRowToReport);
             setReports(incomingReports.sort((a,b) => new Date(b.date) - new Date(a.date)));
             setSyncStatus('import-success');
-        } else if (data.error) {
-            console.error("Sheet Error:", data.error);
+        } else {
+            console.error("Sheet Response:", data);
             setSyncStatus('import-error');
         }
         setTimeout(() => setSyncStatus(null), 3000);
     };
 
     script.onerror = () => {
+        clearTimeout(timeoutId);
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
         setSyncStatus('import-error');
@@ -190,19 +192,18 @@ export default function App() {
           workDescription: row.workDescription, partsReplaced: partsReplaced,
           status: row.status,
           technicianName: row.technicianName || '',
-          signature: null 
       };
   };
 
-  // --- Handlers ---
+  // --- View Actions ---
   const handleNewReport = () => {
     setCurrentReport({
       id: String(Date.now()),
       date: new Date().toISOString().split('T')[0],
-      startTime: getCurrentTime(), // Automatic start time
+      startTime: getCurrentTime(), 
       endTime: '', clientName: '', clientAddress: '',
       deviceModel: '', problemDescription: '', workDescription: '',
-      partsReplaced: [], status: 'pending', technicianName: '', signature: null
+      partsReplaced: [], status: 'pending', technicianName: ''
     });
     setView('form');
   };
@@ -213,6 +214,7 @@ export default function App() {
   };
 
   const handleSaveReport = (reportData) => {
+    // Optimistic UI update
     const existingIndex = reports.findIndex(r => r.id === reportData.id);
     let newReports;
     if (existingIndex >= 0) {
@@ -231,7 +233,7 @@ export default function App() {
 
   const handleDeleteClick = (id, e) => {
     e.stopPropagation();
-    setDeleteConfirm(id); // Open modal
+    setDeleteConfirm(id); 
   };
 
   const performDelete = () => {
@@ -247,7 +249,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" dir="rtl">
       
-      {/* --- HIDDEN IFRAME & FORM FOR SYNC --- */}
+      {/* Hidden Form for Data Submission */}
       {!settings.debugMode && (
           <>
             <iframe name="hidden_iframe" id="hidden_iframe" style={{display: 'none'}}></iframe>
@@ -257,43 +259,32 @@ export default function App() {
           </>
       )}
 
-      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {/* Delete Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center transform transition-all scale-100">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
                 <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
                     <Icons.Trash />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">למחוק את הדוח?</h3>
-                <p className="text-gray-500 mb-6">פעולה זו תמחק את הדוח מהאפליקציה ומהגיליון. לא ניתן לשחזר.</p>
-                <div className="flex gap-3 justify-center">
-                    <button 
-                        onClick={() => setDeleteConfirm(null)}
-                        className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition"
-                    >
-                        ביטול
-                    </button>
-                    <button 
-                        onClick={performDelete}
-                        className="px-5 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition shadow-lg"
-                    >
-                        מחק דוח
-                    </button>
+                <div className="flex gap-3 justify-center mt-6">
+                    <button onClick={() => setDeleteConfirm(null)} className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg">ביטול</button>
+                    <button onClick={performDelete} className="px-5 py-2.5 bg-red-600 text-white font-bold rounded-lg">מחק דוח</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* --- DEBUG MODE UI --- */}
+      {/* Debug Mode UI */}
        {settings.debugMode && (
           <div className="p-4 bg-orange-100 border-b border-orange-300">
-             <p className="font-bold text-red-600 mb-2">מצב דיבאג פעיל (Hidden Frame)</p>
+             <p className="font-bold text-red-600 mb-2">מצב דיבאג פעיל</p>
              <div className="flex gap-4">
-                 <div className="w-1/2">
-                    <p className="text-xs font-bold">טופס נשלח:</p>
-                    <form ref={formRef} action={settings.googleScriptUrl} method="post" target="hidden_iframe" className="text-xs">
+                 <div className="w-1/2 text-xs">
+                    <p className="font-bold">טופס נשלח:</p>
+                    <form ref={formRef} action={settings.googleScriptUrl} method="post" target="hidden_iframe">
                         {formDataForSync && Object.keys(formDataForSync).map(key => (
-                            <div key={key} className="flex gap-2">
+                            <div key={key} className="flex gap-2 mb-1">
                                 <span>{key}:</span>
                                 <input type="text" name={key} value={formDataForSync[key] || ''} className="border p-1 w-full" readOnly/>
                             </div>
@@ -301,17 +292,17 @@ export default function App() {
                     </form>
                  </div>
                  <div className="w-1/2">
-                    <p className="text-xs font-bold">תשובת שרת:</p>
+                    <p className="text-xs font-bold">תשובה:</p>
                     <iframe name="hidden_iframe" id="hidden_iframe" className="w-full h-32 bg-white border"></iframe>
                  </div>
              </div>
           </div>
        )}
 
-      {/* --- MAIN HEADER --- */}
+      {/* Navigation */}
       <nav className="bg-zinc-900 text-white shadow-xl print:hidden sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3 space-x-reverse cursor-pointer hover:opacity-90 transition" onClick={() => setView('list')}>
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3 space-x-reverse cursor-pointer" onClick={() => setView('list')}>
             <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-wider leading-none">ONE ROBOTIX</span>
                 <span className="text-[10px] text-zinc-400 tracking-[0.2em]">SERVICE</span>
@@ -321,23 +312,23 @@ export default function App() {
           <div className="flex items-center gap-3">
               {view === 'list' && (
                 <>
-                    <button onClick={importFromGoogleSheets} className="text-zinc-400 hover:text-white p-2 rounded-full transition relative group" title="רענן נתונים מהענן">
+                    <button onClick={importFromGoogleSheets} className="text-zinc-400 hover:text-white p-2 rounded-full relative" title="רענן">
                        <Icons.DownloadCloud />
                        {syncStatus === 'import-loading' && <span className="absolute top-0 right-0 w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>}
                     </button>
-                    <button onClick={handleNewReport} className="bg-blue-600 text-white pl-4 pr-3 py-2 rounded-full font-medium flex items-center shadow-lg hover:bg-blue-500 transition active:scale-95 text-sm">
+                    <button onClick={handleNewReport} className="bg-blue-600 text-white pl-4 pr-3 py-2 rounded-full font-medium flex items-center shadow-lg hover:bg-blue-500 text-sm">
                         <span className="ml-2"><Icons.Plus /></span><span>דוח חדש</span>
                     </button>
                 </>
               )}
-              <button onClick={() => setView('settings')} className={`p-2 rounded-full hover:bg-zinc-800 transition ${view === 'settings' ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`} title="הגדרות חיבור">
+              <button onClick={() => setView('settings')} className={`p-2 rounded-full hover:bg-zinc-800 ${view === 'settings' ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
                 <Icons.Settings />
               </button>
           </div>
         </div>
       </nav>
 
-      {/* --- NOTIFICATIONS --- */}
+      {/* Notifications */}
       {syncStatus && (
         <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 text-white font-medium transition-all animate-fade-in-down ${
             syncStatus.includes('error') ? 'bg-red-600' : syncStatus.includes('success') ? 'bg-green-600' : 'bg-blue-600'
@@ -347,16 +338,16 @@ export default function App() {
             {syncStatus === 'error' && <span>❌ שגיאה בשליחה.</span>}
             {syncStatus === 'import-loading' && <span>⏳ טוען נתונים...</span>}
             {syncStatus === 'import-success' && <span>✅ הנתונים נטענו!</span>}
-            {syncStatus === 'import-error' && <span>❌ שגיאת טעינה (החיבור נכשל)</span>}
+            {syncStatus === 'import-error' && <span>❌ שגיאת טעינה. נסה לרענן.</span>}
         </div>
       )}
 
-      {/* --- CONTENT AREA --- */}
+      {/* Content */}
       <main className="max-w-5xl mx-auto p-4 md:p-6">
         {view === 'list' && <Dashboard reports={reports} onEdit={handleEditReport} onDelete={handleDeleteClick} />}
         {view === 'form' && <ReportForm initialData={currentReport} onSave={handleSaveReport} onCancel={() => setView('list')} onPreview={(data) => { setCurrentReport(data); setView('preview'); }} />}
         {view === 'preview' && <PrintPreview data={currentReport} onEdit={() => setView('form')} />}
-        {view === 'settings' && <SettingsPage settings={settings} onSave={(newSettings) => { setSettings(newSettings); setView('list'); }} onCancel={() => setView('list')} />}
+        {view === 'settings' && <SettingsPage settings={settings} onSave={(newSettings) => { setSettings(newSettings); setView('list'); }} onCancel={() => setView('list')} onHardReset={hardReset} />}
       </main>
     </div>
   );
@@ -364,7 +355,7 @@ export default function App() {
 
 // --- SUB COMPONENTS ---
 
-function SettingsPage({ settings, onSave, onCancel }) {
+function SettingsPage({ settings, onSave, onCancel, onHardReset }) {
     const [localSettings, setLocalSettings] = useState(settings);
     const [testStatus, setTestStatus] = useState(null);
 
@@ -385,10 +376,6 @@ function SettingsPage({ settings, onSave, onCancel }) {
          };
          document.body.appendChild(script);
     };
-    
-    const openDirectTest = () => {
-        window.open(localSettings.googleScriptUrl, '_blank');
-    };
 
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 max-w-2xl mx-auto">
@@ -404,7 +391,7 @@ function SettingsPage({ settings, onSave, onCancel }) {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
                             <input type="checkbox" id="autoSync" checked={localSettings.autoSync} onChange={(e) => setLocalSettings(prev => ({...prev, autoSync: e.target.checked}))} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
-                            <label htmlFor="autoSync" className="text-gray-700 font-medium cursor-pointer">סנכרון אוטומטי (שמירה/מחיקה)</label>
+                            <label htmlFor="autoSync" className="text-gray-700 font-medium cursor-pointer">סנכרון אוטומטי</label>
                         </div>
                         
                         <div className="flex items-center gap-3 pt-4 border-t border-blue-200/50">
@@ -413,23 +400,22 @@ function SettingsPage({ settings, onSave, onCancel }) {
                         </div>
                     </div>
 
-                    <div className="mt-6 flex gap-3">
-                         <button onClick={testConnection} className="flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition shadow-sm">
-                            <Icons.Wifi /> <span className="mr-2">בדיקת קריאה (JSONP)</span>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                         <button onClick={testConnection} className="flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-white border border-blue-200 text-blue-700 hover:bg-blue-50">
+                            <Icons.Wifi /> <span className="mr-2">בדיקת חיבור</span>
                             {testStatus === 'testing' && '...'}
                             {testStatus === 'success' && '✅ תקין'}
                             {testStatus === 'error' && '❌ שגיאה'}
                         </button>
-                        <button onClick={openDirectTest} className="flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition shadow-sm">
-                            <span className="mr-2">🔗 פתח בדפדפן (JSON)</span>
+                        <button onClick={onHardReset} className="flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-red-50 border border-red-200 text-red-700 hover:bg-red-100">
+                             ⚠️ איפוס מלא
                         </button>
                     </div>
-                    <p className="text-xs text-blue-600/80 mt-2">הערה: ייתכן וטעינת הנתונים לא תעבוד בחלון התצוגה המקדימה, אך תעבוד בכתובת האתר האמיתית.</p>
                 </div>
             </div>
             <div className="mt-10 flex justify-end gap-3 border-t pt-6">
                 <button onClick={onCancel} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition">ביטול</button>
-                <button onClick={() => onSave(localSettings)} className="px-8 py-2.5 bg-zinc-900 text-white font-bold rounded-lg hover:bg-black shadow-lg transition transform active:scale-95">שמור הגדרות</button>
+                <button onClick={() => onSave(localSettings)} className="px-8 py-2.5 bg-zinc-900 text-white font-bold rounded-lg hover:bg-black shadow-lg">שמור הגדרות</button>
             </div>
         </div>
     );
@@ -539,8 +525,6 @@ function ReportForm({ initialData, onSave, onCancel, onPreview }) {
   const handleChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
   const handleAddPart = () => { if (!newPartName) return; const updatedParts = [...(formData.partsReplaced || []), { name: newPartName }]; setFormData(prev => ({ ...prev, partsReplaced: updatedParts })); setNewPartName(''); };
   const removePart = (index) => { const updatedParts = formData.partsReplaced.filter((_, i) => i !== index); setFormData(prev => ({ ...prev, partsReplaced: updatedParts })); };
-  // Function to prevent error, even though signature pad is removed from UI as requested
-  const handleSignature = (sigData) => { setFormData(prev => ({...prev, signature: sigData})); };
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-w-5xl mx-auto">
@@ -661,7 +645,7 @@ function PrintPreview({ data, onEdit }) {
         <div className="bg-white text-black min-h-screen">
             <div className="mb-8 flex justify-between items-center print:hidden bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm max-w-[210mm] mx-auto"><button onClick={onEdit} className="text-gray-600 hover:text-black font-bold flex items-center"><span className="ml-1">→</span> חזרה לעריכה</button><button onClick={handlePrint} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold flex items-center hover:bg-blue-700 shadow transition"><span className="ml-2"><Icons.Printer /></span> הדפס / שמור כ-PDF</button></div>
             <div className="max-w-[210mm] mx-auto bg-white min-h-[297mm] p-12 shadow-2xl print:shadow-none print:w-full print:max-w-none print:p-0 border border-gray-200 print:border-none relative">
-                <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8"><div><h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">דוח שירות טכני</h1><div className="mt-2 flex items-center gap-3"><span className="text-gray-500 font-medium">מספר דוח:</span><span className="bg-gray-100 px-3 py-1 rounded font-mono font-bold text-lg">#{data.id}</span></div></div><div className="text-left flex flex-col items-end"><img src="/ROBOTIX_logo_black_rgb-01.png" alt="ONE ROBOTIX" className="h-12 mb-3 object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} /><h2 className="text-3xl font-black uppercase tracking-widest hidden">One | Robotix</h2><div className="text-sm text-gray-500 font-medium mt-1 text-right leading-relaxed" dir="ltr"><p>Industrial Automation Solutions</p><p>www.onerobotix.co.il</p></div></div></div>
+                <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8"><div><h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">דוח שירות טכני</h1><div className="mt-2 flex items-center gap-3"><span className="text-gray-500 font-medium">מספר דוח:</span><span className="bg-gray-100 px-3 py-1 rounded font-mono font-bold text-lg">#{data.id}</span></div></div><div className="text-left flex flex-col items-end"><img src="/ROBOTIX_logo_black_rgb-01.png" alt="ONE ROBOTIX" className="h-12 mb-3 object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} /><h2 className="text-3xl font-black uppercase tracking-widest hidden">One | Robotix</h2><div className="text-sm text-gray-500 font-medium mt-1 text-right leading-relaxed" dir="ltr"><p>Industrial Automation Solutions</p><p>www.onerobotix.com</p></div></div></div>
                 <div className="grid grid-cols-2 gap-12 mb-10 text-sm"><div className="space-y-4"><h3 className="font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3 text-lg flex items-center"><span className="ml-2"><Icons.User /></span> פרטי לקוח</h3><div className="grid grid-cols-3 gap-y-3"><span className="text-gray-500 font-medium">שם הלקוח:</span><span className="col-span-2 font-bold text-lg text-gray-900">{data.clientName}</span><span className="text-gray-500 font-medium">סניף:</span><span className="col-span-2 text-gray-800">{data.clientAddress}</span></div></div><div className="space-y-4"><h3 className="font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3 text-lg flex items-center"><span className="ml-2"><Icons.Clock /></span> פרטי קריאה</h3><div className="grid grid-cols-3 gap-y-3"><span className="text-gray-500 font-medium">תאריך:</span><span className="col-span-2 font-bold text-gray-900">{data.date}</span><span className="text-gray-500 font-medium">שעות עבודה:</span><span className="col-span-2 font-mono bg-gray-50 inline-block px-2 rounded">{data.startTime} - {data.endTime}</span><span className="text-gray-500 font-medium">שם המטמיע:</span><span className="col-span-2 text-gray-800">{data.technicianName}</span><span className="text-gray-500 font-medium">סטטוס:</span><span className={`col-span-2 font-bold px-2 rounded w-fit ${data.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>{data.status === 'completed' ? 'הושלם' : 'בטיפול'}</span></div></div></div>
                 <div className="mb-8 bg-gray-50 p-6 rounded-xl border border-gray-100 print:bg-transparent print:p-0 print:border-y print:rounded-none print:border-gray-200 print:py-4"><h3 className="font-bold text-gray-900 mb-3 flex items-center"><span className="ml-2"><Icons.Wrench /></span> פרטי ציוד</h3><div className="flex gap-4 text-sm"><span className="text-gray-500 font-medium">דגם המכשיר:</span><span className="font-bold text-gray-900 text-lg">{data.deviceModel}</span></div></div>
                 <div className="mb-10 space-y-6"><div><h3 className="font-bold text-gray-900 mb-2 text-sm uppercase tracking-wide text-gray-500">תיאור התקלה</h3><div className="text-sm p-4 bg-white border border-gray-200 rounded-lg shadow-sm min-h-[60px] text-gray-800 leading-relaxed">{data.problemDescription}</div></div><div><h3 className="font-bold text-gray-900 mb-2 text-sm uppercase tracking-wide text-gray-500">פירוט העבודה שבוצעה</h3><div className="text-sm p-4 bg-white border border-gray-200 rounded-lg shadow-sm min-h-[80px] text-gray-800 leading-relaxed whitespace-pre-line">{data.workDescription}</div></div></div>
