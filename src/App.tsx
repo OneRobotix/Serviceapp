@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-// --- One Robotix Service App ---
-// גרסה סופית למובייל ופרודקשן
-// כולל: איפוס הגדרות, תמיכה מלאה בנייד, ועיצוב יציב
+// --- One Robotix Service App (Client Side) ---
+// גרסה סופית ונקייה (30/01/2026):
+// - הוסרו: אקסל, לוגו בסרגל, חתימות
+// - עודכן: שם המטמיע, סניף, דגם המכשיר
+// - כולל מנגנון סנכרון וייבוא חכם (Hidden Form + JSONP)
 
-// --- ICONS (SVG) ---
+// --- ICONS (SVG Embeds) ---
 const Icons = {
-  Logo: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>,
   Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
   Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
   DownloadCloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>,
@@ -16,7 +17,6 @@ const Icons = {
   Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
   Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
   Sort: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>,
-  Excel: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>,
   Pen: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
   User: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   Wrench: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
@@ -26,32 +26,34 @@ const Icons = {
   Printer: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
   Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
   Wifi: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h.01"/><path d="M2 12.859a16.343 16.343 0 0 1 8-5.858"/><path d="M14.859 7.001a16.343 16.343 0 0 1 8 5.858"/><path d="M4.929 16.071a9.998 9.998 0 0 1 6.071-3.07"/><path d="M13.001 13.001a9.998 9.998 0 0 1 6.071 3.07"/><path d="M8.5 19a4.5 4.5 0 0 1 7 0"/></svg>,
-  Info: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
-  Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
   Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
 };
 
 export default function App() {
-  // --- State ---
+  // --- State Management ---
   const [view, setView] = useState('list'); 
   const [reports, setReports] = useState([]);
   
-  // URL settings - defaulting to your script
-  const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpCjIMK4ylHrwF5XnpmjJoTF9gQpu2ELjpCFPA8KzUFbQxUVXX2oZl3wjxyHyvtvx4/exec';
-  
+  // Settings
   const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem('appSettings');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            // Auto-update to correct URL if needed
-            if (parsed.googleScriptUrl !== DEFAULT_SCRIPT_URL) {
-                 return { ...parsed, googleScriptUrl: DEFAULT_SCRIPT_URL };
-            }
-            return parsed;
-        } catch(e) {}
+    const savedSettings = localStorage.getItem('appSettings');
+    const targetUrl = 'https://script.google.com/macros/s/AKfycbzpCjIMK4ylHrwF5XnpmjJoTF9gQpu2ELjpCFPA8KzUFbQxUVXX2oZl3wjxyHyvtvx4/exec';
+    
+    if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        const normalizeScriptUrl = (raw) => {
+            const s = (raw || '').trim();
+            const m = s.match(/\((https?:\/\/[^)]+)\)/);
+            if (m?.[1]) return m[1].trim();
+            return s.replace(/^\[|\]$/g, '').trim();
+        };
+        const currentNormalized = normalizeScriptUrl(parsed.googleScriptUrl);
+        if (!currentNormalized || currentNormalized !== targetUrl) {
+            return { ...parsed, googleScriptUrl: targetUrl };
+        }
+        return parsed;
     }
-    return { googleScriptUrl: DEFAULT_SCRIPT_URL, autoSync: true, debugMode: false };
+    return { googleScriptUrl: targetUrl, autoSync: true, debugMode: false };
   });
 
   const [currentReport, setCurrentReport] = useState(null);
@@ -61,19 +63,23 @@ export default function App() {
   const formRef = useRef(null);
   const [formDataForSync, setFormDataForSync] = useState(null);
 
+  // --- Helpers ---
+  const getCurrentTime = () => {
+    const now = new Date();
+    return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
   // --- Effects ---
   useEffect(() => {
     localStorage.setItem('appSettings', JSON.stringify(settings));
   }, [settings]);
 
-  // Initial Load
   useEffect(() => {
     if (settings.googleScriptUrl && settings.autoSync) {
         importFromGoogleSheets();
     }
   }, []);
 
-  // Hidden Form Submit
   useEffect(() => {
       if (formDataForSync && formRef.current) {
           formRef.current.submit();
@@ -90,21 +96,8 @@ export default function App() {
       }
   }, [formDataForSync, settings.debugMode]);
 
-  // --- Helpers ---
-  const getCurrentTime = () => {
-    const now = new Date();
-    return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
-  const hardReset = () => {
-      if(confirm('פעולה זו תאפס את הגדרות האפליקציה ותנסה להתחבר מחדש. להמשיך?')) {
-          localStorage.removeItem('appSettings');
-          localStorage.removeItem('serviceReports');
-          window.location.reload();
-      }
-  };
-
-  // --- Logic ---
+  // --- Google Sheets Logic ---
+  
   const syncToGoogleSheets = (reportData, action = 'upsert') => {
     if (!settings.googleScriptUrl) return;
     setSyncStatus('loading');
@@ -130,7 +123,6 @@ export default function App() {
     });
   };
 
-  // Import using JSONP (Fixes CORS on mobile/preview)
   const importFromGoogleSheets = async () => {
     if (!settings.googleScriptUrl) return;
     setSyncStatus('import-loading');
@@ -138,7 +130,6 @@ export default function App() {
     const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
     const script = document.createElement('script');
     
-    // Increased timeout for mobile networks
     const timeoutId = setTimeout(() => {
          if(window[callbackName]) {
              delete window[callbackName];
@@ -172,7 +163,8 @@ export default function App() {
         setTimeout(() => setSyncStatus(null), 3000);
     };
 
-    script.src = `${settings.googleScriptUrl}?callback=${callbackName}&t=${Date.now()}`;
+    const separator = settings.googleScriptUrl.includes('?') ? '&' : '?';
+    script.src = `${settings.googleScriptUrl}${separator}callback=${callbackName}&t=${Date.now()}`;
     document.body.appendChild(script);
   };
 
@@ -214,7 +206,6 @@ export default function App() {
   };
 
   const handleSaveReport = (reportData) => {
-    // Optimistic UI update
     const existingIndex = reports.findIndex(r => r.id === reportData.id);
     let newReports;
     if (existingIndex >= 0) {
@@ -246,10 +237,17 @@ export default function App() {
       }
   };
 
+  const hardReset = () => {
+      if(confirm('פעולה זו תאפס את הגדרות האפליקציה ותנסה להתחבר מחדש. להמשיך?')) {
+          localStorage.removeItem('appSettings');
+          localStorage.removeItem('serviceReports');
+          window.location.reload();
+      }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" dir="rtl">
       
-      {/* Hidden Form for Data Submission */}
       {!settings.debugMode && (
           <>
             <iframe name="hidden_iframe" id="hidden_iframe" style={{display: 'none'}}></iframe>
@@ -259,7 +257,6 @@ export default function App() {
           </>
       )}
 
-      {/* Delete Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
             <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
@@ -267,6 +264,7 @@ export default function App() {
                     <Icons.Trash />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">למחוק את הדוח?</h3>
+                <p className="text-gray-500 mb-6">פעולה זו תמחק את הדוח מהאפליקציה ומהגיליון. לא ניתן לשחזר.</p>
                 <div className="flex gap-3 justify-center mt-6">
                     <button onClick={() => setDeleteConfirm(null)} className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg">ביטול</button>
                     <button onClick={performDelete} className="px-5 py-2.5 bg-red-600 text-white font-bold rounded-lg">מחק דוח</button>
@@ -275,14 +273,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Debug Mode UI */}
        {settings.debugMode && (
           <div className="p-4 bg-orange-100 border-b border-orange-300">
              <p className="font-bold text-red-600 mb-2">מצב דיבאג פעיל</p>
              <div className="flex gap-4">
                  <div className="w-1/2 text-xs">
                     <p className="font-bold">טופס נשלח:</p>
-                    <form ref={formRef} action={settings.googleScriptUrl} method="post" target="hidden_iframe">
+                    <form ref={formRef} action={settings.googleScriptUrl} method="post" target="hidden_iframe" className="text-xs">
                         {formDataForSync && Object.keys(formDataForSync).map(key => (
                             <div key={key} className="flex gap-2 mb-1">
                                 <span>{key}:</span>
@@ -299,7 +296,6 @@ export default function App() {
           </div>
        )}
 
-      {/* Navigation */}
       <nav className="bg-zinc-900 text-white shadow-xl print:hidden sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3 space-x-reverse cursor-pointer" onClick={() => setView('list')}>
@@ -328,7 +324,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Notifications */}
       {syncStatus && (
         <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 text-white font-medium transition-all animate-fade-in-down ${
             syncStatus.includes('error') ? 'bg-red-600' : syncStatus.includes('success') ? 'bg-green-600' : 'bg-blue-600'
@@ -342,7 +337,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Content */}
       <main className="max-w-5xl mx-auto p-4 md:p-6">
         {view === 'list' && <Dashboard reports={reports} onEdit={handleEditReport} onDelete={handleDeleteClick} />}
         {view === 'form' && <ReportForm initialData={currentReport} onSave={handleSaveReport} onCancel={() => setView('list')} onPreview={(data) => { setCurrentReport(data); setView('preview'); }} />}
@@ -352,8 +346,6 @@ export default function App() {
     </div>
   );
 }
-
-// --- SUB COMPONENTS ---
 
 function SettingsPage({ settings, onSave, onCancel, onHardReset }) {
     const [localSettings, setLocalSettings] = useState(settings);
@@ -368,7 +360,9 @@ function SettingsPage({ settings, onSave, onCancel, onHardReset }) {
              setTestStatus('success');
          };
          const script = document.createElement('script');
-         script.src = `${localSettings.googleScriptUrl}?callback=${callbackName}&t=${Date.now()}`;
+         const separator = localSettings.googleScriptUrl.includes('?') ? '&' : '?';
+         script.src = `${localSettings.googleScriptUrl}${separator}callback=${callbackName}&t=${Date.now()}`;
+         
          script.onerror = () => {
              setTestStatus('error');
              delete window[callbackName];
