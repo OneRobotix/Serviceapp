@@ -5,5 +5,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   // שים לב לשינוי: הוספתי / בהתחלה ובסוף
-  base: '/Serviceapp/',
+  base: '/./',
 })
