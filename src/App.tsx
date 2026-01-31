@@ -572,7 +572,7 @@ function ReportForm({ initialData, onSave, onCancel, onPreview }) {
         </section>
 
         <section>
-          <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.Parts /></span> חלקים וחיוב</h3>
+          <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.Parts /></span> חלקים</h3>
           <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <div className="flex gap-4 mb-4 items-end">
                   <div className="flex-grow">
