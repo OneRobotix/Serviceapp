@@ -652,8 +652,8 @@ function ReportForm({ initialData, onSave, onCancel, onPreview, settings }) {
                      <textarea value={aiMessage} onChange={(e) => setAiMessage(e.target.value)} className="w-full p-4 border border-emerald-200 rounded-xl bg-white text-gray-800 text-sm leading-relaxed focus:ring-2 focus:ring-emerald-500 outline-none h-32 resize-none" />
                      <div className="flex gap-3 justify-end">
                          <button onClick={() => setAiMessage('')} className="text-gray-500 text-sm font-medium hover:text-gray-700">ביטול</button>
-                         <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(aiMessage)}`, '_blank')} className="bg-[#25D366] text-white px-5 py-2.5 rounded-lg font-bold shadow hover:bg-[#20bd5a] flex items-center">
-                             שלח לוואטסאפ <span className="mr-2">✈️</span>
+                         <button onClick={() => { navigator.clipboard.writeText(aiMessage); alert('ההודעה הועתקה ללוח!'); }} className="bg-gray-700 text-white px-5 py-2.5 rounded-lg font-bold shadow hover:bg-gray-800 flex items-center">
+                             העתק הודעה <span className="mr-2">📋</span>
                          </button>
                      </div>
                  </div>
