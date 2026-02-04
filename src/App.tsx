@@ -104,10 +104,9 @@ function LoginPage({ onLogin, scriptUrl }) {
 // --- Main App Component ---
 export default function App() {
   const [user, setUser] = useState(null); 
-  const [showAdminModal, setShowAdminModal] = useState(false); // מצב חלונית קוד מנהל
-  const [adminInput, setAdminInput] = useState(''); // הקוד שהוקלד
+  const [showAdminModal, setShowAdminModal] = useState(false); 
+  const [adminInput, setAdminInput] = useState(''); 
   
-  // הגדרת קוד מנהל - שנה כאן אם תרצה
   const ADMIN_CODE = "1234";
 
   // Settings
@@ -121,20 +120,19 @@ export default function App() {
     return { googleScriptUrl: targetUrl, autoSync: true, debugMode: false };
   });
 
-  // Check Remember Me + Cleanup Old Sessions
+  // Check Remember Me + Cleanup
   useEffect(() => {
       const savedUser = localStorage.getItem('service_user');
       if (savedUser) {
           try { 
               const parsedUser = JSON.parse(savedUser);
-              // בדיקה: אם אין שם משתמש, סימן שזה יוזר ישן/שבור - נתק אותו
               if (parsedUser && parsedUser.username) {
                   setUser(parsedUser); 
               } else {
-                  localStorage.removeItem('service_user'); // ניקוי שאריות
+                  localStorage.removeItem('service_user'); 
               }
           } catch(e) {
-              localStorage.removeItem('service_user'); // ניקוי במקרה שגיאה
+              localStorage.removeItem('service_user'); 
           }
       }
   }, []);
@@ -164,7 +162,6 @@ export default function App() {
       }
   };
 
-  // State
   const [view, setView] = useState('list'); 
   const [reports, setReports] = useState([]);
   const [currentReport, setCurrentReport] = useState(null);
@@ -173,18 +170,15 @@ export default function App() {
   const formRef = useRef(null);
   const [formDataForSync, setFormDataForSync] = useState(null);
 
-  // If not logged in -> Show Login Page
   if (!user) {
       return <LoginPage onLogin={handleLoginSuccess} scriptUrl={settings.googleScriptUrl} />;
   }
 
-  // Helpers
   const getCurrentTime = () => {
     const now = new Date();
     return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  // Effects
   useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
 
   useEffect(() => {
@@ -356,7 +350,6 @@ export default function App() {
           </>
       )}
 
-      {/* Admin Code Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
             <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
@@ -365,17 +358,8 @@ export default function App() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">גישה למנהלים בלבד</h3>
                 <p className="text-gray-500 mb-6 text-sm">אנא הזן קוד גישה לכניסה להגדרות</p>
-                
                 <form onSubmit={handleAdminCheck}>
-                    <input 
-                        type="password" 
-                        autoFocus
-                        value={adminInput}
-                        onChange={(e) => setAdminInput(e.target.value)}
-                        className="w-full text-center text-2xl tracking-widest p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none mb-6 font-mono"
-                        placeholder="****"
-                        maxLength={6}
-                    />
+                    <input type="password" autoFocus value={adminInput} onChange={(e) => setAdminInput(e.target.value)} className="w-full text-center text-2xl tracking-widest p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none mb-6 font-mono" placeholder="****" maxLength={6} />
                     <div className="flex gap-3 justify-center">
                         <button type="button" onClick={() => {setShowAdminModal(false); setAdminInput('');}} className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg w-full">ביטול</button>
                         <button type="submit" className="px-5 py-2.5 bg-zinc-900 text-white font-bold rounded-lg w-full">אישור</button>
@@ -423,7 +407,6 @@ export default function App() {
                 </>
               )}
               
-              {/* כפתור הגדרות - כעת פותח את המודל של הקוד */}
               <button onClick={() => setShowAdminModal(true)} className={`p-2 rounded-full hover:bg-zinc-800 ${view === 'settings' ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
                 <Icons.Settings />
               </button>
@@ -457,8 +440,6 @@ export default function App() {
     </div>
   );
 }
-
-// --- Sub Components ---
 
 function SettingsPage({ settings, onSave, onCancel, onHardReset }) {
     const [localSettings, setLocalSettings] = useState(settings);
@@ -548,7 +529,6 @@ function Dashboard({ reports, onEdit, onDelete }) {
 
   return (
     <div className="space-y-8">
-      {/* Filters */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
         <div className="md:col-span-1">
             <label className="text-xs font-bold text-gray-500 mb-2 block tracking-wide">חיפוש חופשי</label>
@@ -578,7 +558,6 @@ function Dashboard({ reports, onEdit, onDelete }) {
         </div>
       </div>
 
-      {/* Header Row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h2 className="text-3xl font-bold text-gray-800">דוחות שירות</h2>
@@ -586,7 +565,6 @@ function Dashboard({ reports, onEdit, onDelete }) {
         </div>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid gap-4">
         {processedReports.map(report => (
           <div key={report.id} onClick={() => onEdit(report)} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition cursor-pointer flex justify-between items-center group relative overflow-hidden">
