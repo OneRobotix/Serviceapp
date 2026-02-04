@@ -106,10 +106,9 @@ export default function App() {
   const [user, setUser] = useState(null); 
   const [showAdminModal, setShowAdminModal] = useState(false); 
   const [adminInput, setAdminInput] = useState(''); 
-  
   const ADMIN_CODE = "1234";
 
-  // Settings
+  // State Declarations
   const [settings, setSettings] = useState(() => {
     const savedSettings = localStorage.getItem('appSettings');
     const targetUrl = 'https://script.google.com/macros/s/AKfycbzpCjIMK4ylHrwF5XnpmjJoTF9gQpu2ELjpCFPA8KzUFbQxUVXX2oZl3wjxyHyvtvx4/exec';
@@ -120,7 +119,17 @@ export default function App() {
     return { googleScriptUrl: targetUrl, autoSync: true, debugMode: false };
   });
 
-  // Check Remember Me + Cleanup
+  const [view, setView] = useState('list'); 
+  const [reports, setReports] = useState([]);
+  const [currentReport, setCurrentReport] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const formRef = useRef(null);
+  const [formDataForSync, setFormDataForSync] = useState(null);
+
+  // --- Effects (Must be declared before any return) ---
+
+  // Check Remember Me
   useEffect(() => {
       const savedUser = localStorage.getItem('service_user');
       if (savedUser) {
@@ -136,6 +145,37 @@ export default function App() {
           }
       }
   }, []);
+
+  // Save Settings
+  useEffect(() => { 
+      localStorage.setItem('appSettings', JSON.stringify(settings)); 
+  }, [settings]);
+
+  // Initial Sync
+  useEffect(() => {
+    if (settings.googleScriptUrl && settings.autoSync) {
+        importFromGoogleSheets();
+    }
+  }, []);
+
+  // Form Submission Sync
+  useEffect(() => {
+      if (formDataForSync && formRef.current) {
+          formRef.current.submit();
+          setSyncStatus('success');
+          if (!settings.debugMode) {
+            setTimeout(() => {
+                setSyncStatus(null);
+                setFormDataForSync(null);
+                if (formDataForSync.action !== 'delete') {
+                    setTimeout(importFromGoogleSheets, 2500); 
+                }
+            }, 2000);
+          }
+      }
+  }, [formDataForSync, settings.debugMode]);
+
+  // --- Helpers ---
 
   const handleLoginSuccess = (userData, remember) => {
       setUser(userData);
@@ -162,46 +202,10 @@ export default function App() {
       }
   };
 
-  const [view, setView] = useState('list'); 
-  const [reports, setReports] = useState([]);
-  const [currentReport, setCurrentReport] = useState(null);
-  const [syncStatus, setSyncStatus] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const formRef = useRef(null);
-  const [formDataForSync, setFormDataForSync] = useState(null);
-
-  if (!user) {
-      return <LoginPage onLogin={handleLoginSuccess} scriptUrl={settings.googleScriptUrl} />;
-  }
-
   const getCurrentTime = () => {
     const now = new Date();
     return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
-
-  useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
-
-  useEffect(() => {
-    if (settings.googleScriptUrl && settings.autoSync) {
-        importFromGoogleSheets();
-    }
-  }, []);
-
-  useEffect(() => {
-      if (formDataForSync && formRef.current) {
-          formRef.current.submit();
-          setSyncStatus('success');
-          if (!settings.debugMode) {
-            setTimeout(() => {
-                setSyncStatus(null);
-                setFormDataForSync(null);
-                if (formDataForSync.action !== 'delete') {
-                    setTimeout(importFromGoogleSheets, 2500); 
-                }
-            }, 2000);
-          }
-      }
-  }, [formDataForSync, settings.debugMode]);
 
   const syncToGoogleSheets = (reportData, action = 'upsert') => {
     if (!settings.googleScriptUrl) return;
@@ -337,6 +341,12 @@ export default function App() {
           window.location.reload();
       }
   };
+
+  // --- RENDER ---
+  // If not logged in -> Show Login Page (Now safe to return here)
+  if (!user) {
+      return <LoginPage onLogin={handleLoginSuccess} scriptUrl={settings.googleScriptUrl} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans" dir="rtl">
