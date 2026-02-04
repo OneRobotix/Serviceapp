@@ -30,13 +30,12 @@ function LoginPage({ onLogin, scriptUrl }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
-    const [status, setStatus] = useState(null); // loading, error, success
+    const [status, setStatus] = useState(null);
 
     const handleSubmit = (e) => {
         e.preventDefault();
         setStatus('loading');
 
-        // שימוש ב-JSONP כדי לבדוק משתמש ב-Sheet
         const callbackName = 'login_cb_' + Math.round(100000 * Math.random());
         window[callbackName] = (data) => {
             delete window[callbackName];
@@ -58,7 +57,6 @@ function LoginPage({ onLogin, scriptUrl }) {
         };
 
         const separator = scriptUrl.includes('?') ? '&' : '?';
-        // אנו שולחים action=login
         script.src = `${scriptUrl}${separator}callback=${callbackName}&action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&t=${Date.now()}`;
         document.body.appendChild(script);
     };
@@ -67,8 +65,7 @@ function LoginPage({ onLogin, scriptUrl }) {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4" dir="rtl">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
                 <div className="text-center mb-8">
-                     <img src="/ROBOTIX_logo_black_rgb-01.png" alt="ONE ROBOTIX" className="h-12 mx-auto mb-4 object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-                     <h2 className="text-2xl font-bold text-gray-800 hidden">ONE ROBOTIX</h2>
+                     <h2 className="text-3xl font-black text-gray-900 tracking-wider mb-2">ONE ROBOTIX</h2>
                      <p className="text-gray-500">התחברות למערכת שירות</p>
                 </div>
 
@@ -106,23 +103,39 @@ function LoginPage({ onLogin, scriptUrl }) {
 
 // --- Main App Component ---
 export default function App() {
-  const [user, setUser] = useState(null); // מצב התחברות
+  const [user, setUser] = useState(null); 
+  const [showAdminModal, setShowAdminModal] = useState(false); // מצב חלונית קוד מנהל
+  const [adminInput, setAdminInput] = useState(''); // הקוד שהוקלד
   
+  // הגדרת קוד מנהל - שנה כאן אם תרצה
+  const ADMIN_CODE = "1234";
+
   // Settings
   const [settings, setSettings] = useState(() => {
     const savedSettings = localStorage.getItem('appSettings');
     const targetUrl = 'https://script.google.com/macros/s/AKfycbzpCjIMK4ylHrwF5XnpmjJoTF9gQpu2ELjpCFPA8KzUFbQxUVXX2oZl3wjxyHyvtvx4/exec';
+    
     if (savedSettings) {
         try { return JSON.parse(savedSettings); } catch(e) {}
     }
     return { googleScriptUrl: targetUrl, autoSync: true, debugMode: false };
   });
 
-  // בדיקת "זכור אותי" בטעינה
+  // Check Remember Me + Cleanup Old Sessions
   useEffect(() => {
       const savedUser = localStorage.getItem('service_user');
       if (savedUser) {
-          try { setUser(JSON.parse(savedUser)); } catch(e) {}
+          try { 
+              const parsedUser = JSON.parse(savedUser);
+              // בדיקה: אם אין שם משתמש, סימן שזה יוזר ישן/שבור - נתק אותו
+              if (parsedUser && parsedUser.username) {
+                  setUser(parsedUser); 
+              } else {
+                  localStorage.removeItem('service_user'); // ניקוי שאריות
+              }
+          } catch(e) {
+              localStorage.removeItem('service_user'); // ניקוי במקרה שגיאה
+          }
       }
   }, []);
 
@@ -139,7 +152,19 @@ export default function App() {
       window.location.reload();
   };
 
-  // --- שאר ה-State של האפליקציה ---
+  const handleAdminCheck = (e) => {
+      e.preventDefault();
+      if (adminInput === ADMIN_CODE) {
+          setShowAdminModal(false);
+          setAdminInput('');
+          setView('settings');
+      } else {
+          alert('קוד שגוי!');
+          setAdminInput('');
+      }
+  };
+
+  // State
   const [view, setView] = useState('list'); 
   const [reports, setReports] = useState([]);
   const [currentReport, setCurrentReport] = useState(null);
@@ -148,25 +173,25 @@ export default function App() {
   const formRef = useRef(null);
   const [formDataForSync, setFormDataForSync] = useState(null);
 
-  // --- אם לא מחובר, הצג מסך התחברות ---
+  // If not logged in -> Show Login Page
   if (!user) {
       return <LoginPage onLogin={handleLoginSuccess} scriptUrl={settings.googleScriptUrl} />;
   }
 
-  // --- Helpers ---
+  // Helpers
   const getCurrentTime = () => {
     const now = new Date();
     return now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  // --- Effects ---
+  // Effects
   useEffect(() => { localStorage.setItem('appSettings', JSON.stringify(settings)); }, [settings]);
 
   useEffect(() => {
     if (settings.googleScriptUrl && settings.autoSync) {
         importFromGoogleSheets();
     }
-  }, []); // Run once on mount
+  }, []);
 
   useEffect(() => {
       if (formDataForSync && formRef.current) {
@@ -261,7 +286,6 @@ export default function App() {
   };
 
   const handleNewReport = () => {
-    // כאן התיקון הגדול! משתמשים בשם של המשתמש המחובר
     setCurrentReport({
       id: String(Date.now()),
       date: new Date().toISOString().split('T')[0],
@@ -269,7 +293,7 @@ export default function App() {
       endTime: '', clientName: '', clientAddress: '',
       deviceModel: '', problemDescription: '', workDescription: '',
       partsReplaced: [], status: 'pending', 
-      technicianName: user.name || '' // מילוי אוטומטי של שם הטכנאי
+      technicianName: user.name || '' 
     });
     setView('form');
   };
@@ -315,7 +339,7 @@ export default function App() {
       if(confirm('פעולה זו תאפס את הגדרות האפליקציה ותנסה להתחבר מחדש. להמשיך?')) {
           localStorage.removeItem('appSettings');
           localStorage.removeItem('serviceReports');
-          localStorage.removeItem('service_user'); // מחיקת יוזר
+          localStorage.removeItem('service_user');
           window.location.reload();
       }
   };
@@ -330,6 +354,35 @@ export default function App() {
                 {formDataForSync && Object.keys(formDataForSync).map(key => (<input key={key} type="hidden" name={key} value={formDataForSync[key] || ''} />))}
             </form>
           </>
+      )}
+
+      {/* Admin Code Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
+                <div className="mx-auto w-12 h-12 bg-zinc-900 text-white rounded-full flex items-center justify-center mb-4">
+                    <Icons.Lock />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">גישה למנהלים בלבד</h3>
+                <p className="text-gray-500 mb-6 text-sm">אנא הזן קוד גישה לכניסה להגדרות</p>
+                
+                <form onSubmit={handleAdminCheck}>
+                    <input 
+                        type="password" 
+                        autoFocus
+                        value={adminInput}
+                        onChange={(e) => setAdminInput(e.target.value)}
+                        className="w-full text-center text-2xl tracking-widest p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none mb-6 font-mono"
+                        placeholder="****"
+                        maxLength={6}
+                    />
+                    <div className="flex gap-3 justify-center">
+                        <button type="button" onClick={() => {setShowAdminModal(false); setAdminInput('');}} className="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg w-full">ביטול</button>
+                        <button type="submit" className="px-5 py-2.5 bg-zinc-900 text-white font-bold rounded-lg w-full">אישור</button>
+                    </div>
+                </form>
+            </div>
+        </div>
       )}
 
       {deleteConfirm && (
@@ -369,9 +422,12 @@ export default function App() {
                     </button>
                 </>
               )}
-              <button onClick={() => setView('settings')} className={`p-2 rounded-full hover:bg-zinc-800 ${view === 'settings' ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
+              
+              {/* כפתור הגדרות - כעת פותח את המודל של הקוד */}
+              <button onClick={() => setShowAdminModal(true)} className={`p-2 rounded-full hover:bg-zinc-800 ${view === 'settings' ? 'bg-zinc-800 text-blue-400' : 'text-zinc-400'}`}>
                 <Icons.Settings />
               </button>
+              
               <button onClick={handleLogout} className="p-2 rounded-full hover:bg-red-900 text-zinc-400 hover:text-white" title="התנתק">
                   <Icons.LogOut />
               </button>
@@ -402,8 +458,172 @@ export default function App() {
   );
 }
 
-// שאר הקומפוננטות (SettingsPage, Dashboard, ReportForm, PrintPreview) נשארות זהות לקוד המקורי,
-// חוץ משינוי קטן אחד ב-ReportForm:
+// --- Sub Components ---
+
+function SettingsPage({ settings, onSave, onCancel, onHardReset }) {
+    const [localSettings, setLocalSettings] = useState(settings);
+    const [testStatus, setTestStatus] = useState(null);
+
+    const testConnection = () => {
+        setTestStatus('testing');
+         const callbackName = 'jsonp_test_' + Math.round(10000 * Math.random());
+         window[callbackName] = (data) => {
+             delete window[callbackName];
+             if(document.body.contains(script)) document.body.removeChild(script);
+             setTestStatus('success');
+         };
+         const script = document.createElement('script');
+         const separator = localSettings.googleScriptUrl.includes('?') ? '&' : '?';
+         script.src = `${localSettings.googleScriptUrl}${separator}callback=${callbackName}&t=${Date.now()}`;
+         
+         script.onerror = () => {
+             setTestStatus('error');
+             delete window[callbackName];
+             if(document.body.contains(script)) document.body.removeChild(script);
+         };
+         document.body.appendChild(script);
+    };
+
+    return (
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 max-w-2xl mx-auto">
+            <h2 className="text-2xl font-bold mb-8 flex items-center text-gray-800"><Icons.Settings /><span className="mr-3">הגדרות מערכת</span></h2>
+            <div className="space-y-8">
+                <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                    <h3 className="font-bold text-blue-900 mb-4 flex items-center text-lg"><Icons.Settings /><span className="mr-2">חיבור לגוגל שיטס</span></h3>
+                    <div className="mb-6">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">כתובת הסקריפט (Web App URL)</label>
+                        <input type="text" value={localSettings.googleScriptUrl} onChange={(e) => setLocalSettings(prev => ({...prev, googleScriptUrl: e.target.value}))} className="w-full p-3 border border-blue-200 rounded-lg text-left ltr bg-white text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none shadow-sm" dir="ltr" />
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <input type="checkbox" id="autoSync" checked={localSettings.autoSync} onChange={(e) => setLocalSettings(prev => ({...prev, autoSync: e.target.checked}))} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                            <label htmlFor="autoSync" className="text-gray-700 font-medium cursor-pointer">סנכרון אוטומטי</label>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 pt-4 border-t border-blue-200/50">
+                            <input type="checkbox" id="debugMode" checked={localSettings.debugMode} onChange={(e) => setLocalSettings(prev => ({...prev, debugMode: e.target.checked}))} className="w-5 h-5 text-red-500 rounded focus:ring-red-500" />
+                            <label htmlFor="debugMode" className="text-red-700 font-medium cursor-pointer">מצב דיבאג (הצג מנגנון נסתר)</label>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap gap-3">
+                         <button onClick={testConnection} className="flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-white border border-blue-200 text-blue-700 hover:bg-blue-50">
+                            <Icons.Wifi /> <span className="mr-2">בדיקת חיבור</span>
+                            {testStatus === 'testing' && '...'}
+                            {testStatus === 'success' && '✅ תקין'}
+                            {testStatus === 'error' && '❌ שגיאה'}
+                        </button>
+                        <button onClick={onHardReset} className="flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-red-50 border border-red-200 text-red-700 hover:bg-red-100">
+                             ⚠️ איפוס מלא
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div className="mt-10 flex justify-end gap-3 border-t pt-6">
+                <button onClick={onCancel} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition">ביטול</button>
+                <button onClick={() => onSave(localSettings)} className="px-8 py-2.5 bg-zinc-900 text-white font-bold rounded-lg hover:bg-black shadow-lg">שמור הגדרות</button>
+            </div>
+        </div>
+    );
+}
+
+function Dashboard({ reports, onEdit, onDelete }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [sortBy, setSortBy] = useState('dateDesc'); 
+
+  const processedReports = reports.filter(report => {
+        const matchesSearch = (report.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (report.clientAddress || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const reportDate = report.date;
+        const matchesStart = dateRange.start ? reportDate >= dateRange.start : true;
+        const matchesEnd = dateRange.end ? reportDate <= dateRange.end : true;
+        return matchesSearch && matchesStart && matchesEnd;
+    }).sort((a, b) => {
+        if (sortBy === 'dateDesc') return new Date(b.date) - new Date(a.date);
+        if (sortBy === 'dateAsc') return new Date(a.date) - new Date(b.date);
+        if (sortBy === 'name') return a.clientName.localeCompare(b.clientName);
+        return 0;
+    });
+
+  return (
+    <div className="space-y-8">
+      {/* Filters */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+        <div className="md:col-span-1">
+            <label className="text-xs font-bold text-gray-500 mb-2 block tracking-wide">חיפוש חופשי</label>
+            <div className="relative">
+                <div className="absolute top-3 right-3 text-gray-400"><Icons.Search /></div>
+                <input type="text" placeholder="לקוח, סניף..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pr-10 pl-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition" />
+            </div>
+        </div>
+        <div>
+            <label className="text-xs font-bold text-gray-500 mb-2 block tracking-wide">מתאריך</label>
+            <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition text-gray-600" />
+        </div>
+        <div>
+            <label className="text-xs font-bold text-gray-500 mb-2 block tracking-wide">עד תאריך</label>
+            <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition text-gray-600" />
+        </div>
+        <div>
+            <label className="text-xs font-bold text-gray-500 mb-2 block tracking-wide">מיון לפי</label>
+            <div className="relative">
+                <div className="absolute top-3 right-3 text-gray-400"><Icons.Sort /></div>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full pr-10 pl-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition appearance-none cursor-pointer bg-white">
+                    <option value="dateDesc">תאריך (חדש לישן)</option>
+                    <option value="dateAsc">תאריך (ישן לחדש)</option>
+                    <option value="name">שם לקוח (א-ת)</option>
+                </select>
+            </div>
+        </div>
+      </div>
+
+      {/* Header Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 className="text-3xl font-bold text-gray-800">דוחות שירות</h2>
+            <span className="text-gray-500 text-sm mt-1 block">נמצאו {processedReports.length} רשומות במערכת</span>
+        </div>
+      </div>
+
+      {/* Reports Grid */}
+      <div className="grid gap-4">
+        {processedReports.map(report => (
+          <div key={report.id} onClick={() => onEdit(report)} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition cursor-pointer flex justify-between items-center group relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-blue-500 transition-colors"></div>
+            <div className="flex items-start space-x-5 space-x-reverse">
+              <div className={`p-3 rounded-full ${report.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                {report.status === 'completed' ? <Icons.CheckCircle /> : <Icons.Clock />}
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-700 transition">
+                  {report.clientName}
+                  {report.clientAddress && <span className="font-normal text-gray-500 text-base">, {report.clientAddress}</span>}
+                </h3>
+                <p className="text-gray-500 text-sm mb-2">{report.deviceModel}</p>
+                <div className="flex items-center text-gray-400 text-xs mt-1 space-x-4 space-x-reverse bg-gray-50 px-2 py-1 rounded inline-block">
+                    <span className="flex items-center gap-1"><Icons.Calendar /> {report.date}</span>
+                    <span className="w-px h-3 bg-gray-300"></span>
+                    <span className="flex items-center gap-1 text-gray-500"> {report.technicianName}</span>
+                </div>
+              </div>
+            </div>
+            <button onClick={(e) => onDelete(report.id, e)} className="text-gray-300 hover:text-red-500 p-3 rounded-full hover:bg-red-50 transition opacity-0 group-hover:opacity-100">
+                <Icons.Trash />
+            </button>
+          </div>
+        ))}
+        {processedReports.length === 0 && (
+            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
+                <div className="text-gray-300 mb-4 flex justify-center"><Icons.Search /></div>
+                <p className="text-gray-500 font-medium">לא נמצאו דוחות תואמים לסינון.</p>
+                <button onClick={() => {setSearchTerm(''); setDateRange({start:'', end:''});}} className="text-blue-600 text-sm mt-2 hover:underline">נקה סינון</button>
+            </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ReportForm({ initialData, onSave, onCancel, onPreview }) {
   const [formData, setFormData] = useState(initialData);
@@ -524,4 +744,33 @@ function ReportForm({ initialData, onSave, onCancel, onPreview }) {
       </div>
     </div>
   );
+}
+
+function PrintPreview({ data, onEdit }) {
+    const handlePrint = () => window.print();
+    return (
+        <div className="bg-white text-black min-h-screen">
+            <div className="mb-8 flex justify-between items-center print:hidden bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm max-w-[210mm] mx-auto"><button onClick={onEdit} className="text-gray-600 hover:text-black font-bold flex items-center"><span className="ml-1">→</span> חזרה לעריכה</button><button onClick={handlePrint} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold flex items-center hover:bg-blue-700 shadow transition"><span className="ml-2"><Icons.Printer /></span> הדפס / שמור כ-PDF</button></div>
+            <div className="max-w-[210mm] mx-auto bg-white min-h-[297mm] p-12 shadow-2xl print:shadow-none print:w-full print:max-w-none print:p-0 border border-gray-200 print:border-none relative">
+                
+                <div className="flex justify-between items-start border-b-4 border-black pb-6 mb-8">
+                    <div>
+                        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">דוח שירות טכני</h1>
+                        <div className="mt-2 flex items-center gap-3"><span className="text-gray-500 font-medium">מספר דוח:</span><span className="bg-gray-100 px-3 py-1 rounded font-mono font-bold text-lg">#{data.id}</span></div>
+                    </div>
+                    <div className="text-left flex flex-col items-end">
+                        <h2 className="text-3xl font-black uppercase tracking-widest text-gray-800">One | Robotix</h2>
+                        <div className="text-sm text-gray-500 font-medium mt-1 text-right leading-relaxed" dir="ltr"><p>Industrial Automation Solutions</p><p>www.onerobotix.co.il</p></div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-12 mb-10 text-sm"><div className="space-y-4"><h3 className="font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3 text-lg flex items-center"><span className="ml-2"><Icons.User /></span> פרטי לקוח</h3><div className="grid grid-cols-3 gap-y-3"><span className="text-gray-500 font-medium">שם הלקוח:</span><span className="col-span-2 font-bold text-lg text-gray-900">{data.clientName}</span><span className="text-gray-500 font-medium">סניף:</span><span className="col-span-2 text-gray-800">{data.clientAddress}</span></div></div><div className="space-y-4"><h3 className="font-bold text-gray-900 border-b border-gray-200 pb-2 mb-3 text-lg flex items-center"><span className="ml-2"><Icons.Clock /></span> פרטי קריאה</h3><div className="grid grid-cols-3 gap-y-3"><span className="text-gray-500 font-medium">תאריך:</span><span className="col-span-2 font-bold text-gray-900">{data.date}</span><span className="text-gray-500 font-medium">שעות עבודה:</span><span className="col-span-2 font-mono bg-gray-50 inline-block px-2 rounded">{data.startTime} - {data.endTime}</span><span className="text-gray-500 font-medium">שם המטמיע:</span><span className="col-span-2 text-gray-800">{data.technicianName}</span><span className="text-gray-500 font-medium">סטטוס:</span><span className={`col-span-2 font-bold px-2 rounded w-fit ${data.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>{data.status === 'completed' ? 'הושלם' : 'בטיפול'}</span></div></div></div>
+                <div className="mb-8 bg-gray-50 p-6 rounded-xl border border-gray-100 print:bg-transparent print:p-0 print:border-y print:rounded-none print:border-gray-200 print:py-4"><h3 className="font-bold text-gray-900 mb-3 flex items-center"><span className="ml-2"><Icons.Wrench /></span> פרטי ציוד</h3><div className="flex gap-4 text-sm"><span className="text-gray-500 font-medium">דגם המכשיר:</span><span className="font-bold text-gray-900 text-lg">{data.deviceModel}</span></div></div>
+                <div className="mb-10 space-y-6"><div><h3 className="font-bold text-gray-900 mb-2 text-sm uppercase tracking-wide text-gray-500">תיאור התקלה</h3><div className="text-sm p-4 bg-white border border-gray-200 rounded-lg shadow-sm min-h-[60px] text-gray-800 leading-relaxed">{data.problemDescription}</div></div><div><h3 className="font-bold text-gray-900 mb-2 text-sm uppercase tracking-wide text-gray-500">פירוט העבודה שבוצעה</h3><div className="text-sm p-4 bg-white border border-gray-200 rounded-lg shadow-sm min-h-[80px] text-gray-800 leading-relaxed whitespace-pre-line">{data.workDescription}</div></div></div>
+                <div className="mb-12"><h3 className="font-bold text-gray-900 mb-3 text-lg border-b-2 border-gray-800 pb-1 inline-block">חלקים שהוחלפו</h3><table className="w-full text-sm border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 print:bg-gray-50"><th className="text-right p-3 font-bold text-gray-700">תיאור פריט</th></tr></thead><tbody>{data.partsReplaced && data.partsReplaced.length > 0 ? (data.partsReplaced.map((part, i) => (<tr key={i} className="border-b border-gray-100"><td className="p-3 text-gray-800">{part.name}</td></tr>))) : (<tr><td className="p-4 text-center text-gray-400 italic bg-gray-50 rounded">לא נרשמו חלקים</td></tr>)}</tbody></table></div>
+                
+                <div className="absolute bottom-6 right-0 left-0 text-center border-t border-gray-100 pt-4"><p className="text-xs text-gray-400 font-medium tracking-widest uppercase">One Robotix - Advanced Automation Service</p><p className="text-[10px] text-gray-300 mt-1">Generated by ServicePro</p></div>
+            </div>
+        </div>
+    );
 }
