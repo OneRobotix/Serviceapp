@@ -37,9 +37,16 @@ function LoginPage({ onLogin, scriptUrl }) {
         setStatus('loading');
 
         const callbackName = 'login_cb_' + Math.round(100000 * Math.random());
-        window[callbackName] = (data) => {
+        
+        // Define cleanup function
+        const cleanup = () => {
             delete window[callbackName];
-            if(document.body.contains(script)) document.body.removeChild(script);
+            const script = document.getElementById(callbackName);
+            if (script) document.body.removeChild(script);
+        };
+
+        window[callbackName] = (data) => {
+            cleanup();
             if (data.result === 'success') {
                 setStatus('success');
                 setTimeout(() => onLogin(data.user, rememberMe), 500);
@@ -49,10 +56,10 @@ function LoginPage({ onLogin, scriptUrl }) {
         };
 
         const script = document.createElement('script');
+        script.id = callbackName;
         script.onerror = () => {
+            cleanup();
             setStatus('error');
-            delete window[callbackName];
-            if(document.body.contains(script)) document.body.removeChild(script);
         };
 
         const separator = scriptUrl.includes('?') ? '&' : '?';
@@ -195,18 +202,25 @@ export default function App() {
     setSyncStatus('import-loading');
     const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
     const script = document.createElement('script');
+    script.id = callbackName;
+
+    // Clean up function
+    const cleanup = () => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+    };
+
     const timeoutId = setTimeout(() => {
          if(window[callbackName]) {
-             delete window[callbackName];
-             if(document.body.contains(script)) document.body.removeChild(script);
+             cleanup();
              setSyncStatus('import-error');
              setTimeout(() => setSyncStatus(null), 4000);
          }
     }, 15000);
+
     window[callbackName] = (data) => {
         clearTimeout(timeoutId);
-        delete window[callbackName];
-        if(document.body.contains(script)) document.body.removeChild(script);
+        cleanup(); // Wipe trace immediately
         if (Array.isArray(data)) {
             const incomingReports = data.map(parseSheetRowToReport);
             setReports(incomingReports.sort((a,b) => new Date(b.date) - new Date(a.date)));
@@ -214,10 +228,10 @@ export default function App() {
         } else { setSyncStatus('import-error'); }
         setTimeout(() => setSyncStatus(null), 3000);
     };
+
     script.onerror = () => {
         clearTimeout(timeoutId);
-        delete window[callbackName];
-        if (document.body.contains(script)) document.body.removeChild(script);
+        cleanup();
         setSyncStatus('import-error');
         setTimeout(() => setSyncStatus(null), 3000);
     };
@@ -364,7 +378,7 @@ export default function App() {
       )}
       <main className="max-w-5xl mx-auto p-4 md:p-6">
         {view === 'list' && <Dashboard reports={reports} onEdit={(r) => {setCurrentReport(r); setView('form')}} onDelete={handleDeleteClick} />}
-        {view === 'form' && <ReportForm initialData={currentReport} onSave={handleSaveReport} onCancel={() => setView('list')} onPreview={(d) => { setCurrentReport(d); setView('preview'); }} />}
+        {view === 'form' && <ReportForm initialData={currentReport} onSave={handleSaveReport} onCancel={() => setView('list')} onPreview={(d) => { setCurrentReport(d); setView('preview'); }} settings={settings} />}
         {view === 'preview' && <PrintPreview data={currentReport} onEdit={() => setView('form')} />}
         {view === 'settings' && <SettingsPage settings={settings} onSave={(newSettings) => { setSettings(newSettings); setView('list'); }} onCancel={() => setView('list')} onHardReset={hardReset} />}
       </main>
@@ -535,13 +549,55 @@ function Dashboard({ reports, onEdit, onDelete }) {
   );
 }
 
-function ReportForm({ initialData, onSave, onCancel, onPreview }) {
+function ReportForm({ initialData, onSave, onCancel, onPreview, settings }) {
   const [formData, setFormData] = useState(initialData);
   const [newPartName, setNewPartName] = useState('');
+  const [aiMessage, setAiMessage] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
   const handleAddPart = () => { if (!newPartName) return; const updatedParts = [...(formData.partsReplaced || []), { name: newPartName }]; setFormData(prev => ({ ...prev, partsReplaced: updatedParts })); setNewPartName(''); };
   const removePart = (index) => { const updatedParts = formData.partsReplaced.filter((_, i) => i !== index); setFormData(prev => ({ ...prev, partsReplaced: updatedParts })); };
+
+  const handleGenerateAI = () => {
+      if (!settings?.googleScriptUrl) return alert("חסרה הגדרת כתובת סקריפט");
+      
+      setIsGenerating(true);
+      const callbackName = 'ai_cb_' + Math.round(100000 * Math.random());
+      
+      const cleanup = () => { delete window[callbackName]; const s = document.getElementById(callbackName); if(s) document.body.removeChild(s); };
+
+      window[callbackName] = (data) => {
+          cleanup();
+          setIsGenerating(false);
+          if (data.result === 'success') {
+              setAiMessage(data.message);
+          } else {
+              alert('שגיאה ביצירת הודעה: ' + (data.error || 'לא ידועה'));
+          }
+      };
+
+      const script = document.createElement('script');
+      script.id = callbackName;
+      script.onerror = () => { cleanup(); setIsGenerating(false); alert('שגיאת תקשורת'); };
+
+      const partsStr = formData.partsReplaced ? formData.partsReplaced.map(p => p.name).join(', ') : '';
+      const baseUrl = settings.googleScriptUrl.includes('?') ? settings.googleScriptUrl + '&' : settings.googleScriptUrl + '?';
+      const params = new URLSearchParams({
+          action: 'generate_summary',
+          callback: callbackName,
+          clientName: formData.clientName || '',
+          clientAddress: formData.clientAddress || '',
+          deviceModel: formData.deviceModel || '',
+          problemDescription: formData.problemDescription || '',
+          workDescription: formData.workDescription || '',
+          partsReplaced: partsStr,
+          technicianName: formData.technicianName || ''
+      }).toString();
+
+      script.src = baseUrl + params;
+      document.body.appendChild(script);
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-w-5xl mx-auto">
@@ -550,28 +606,13 @@ function ReportForm({ initialData, onSave, onCancel, onPreview }) {
       <div className="p-8 space-y-10">
         <section>
           <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.User /></span> פרטי לקוח</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8"> {/* Responsive: 1 col mobile, 2 col large */}
-              <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">שם הלקוח</label>
-                  <input type="text" name="clientName" value={formData.clientName} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-gray-50 focus:bg-white" placeholder="שם מלא / חברה" />
-              </div>
-              <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">סניף</label>
-                  <input type="text" name="clientAddress" value={formData.clientAddress} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-gray-50 focus:bg-white" />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">שם הלקוח</label><input type="text" name="clientName" value={formData.clientName} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white" /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">סניף</label><input type="text" name="clientAddress" value={formData.clientAddress} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white" /></div>
               <div className="grid grid-cols-3 gap-4 col-span-1 lg:col-span-2">
-                  <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">תאריך</label>
-                      <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                  </div>
-                  <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">התחלה</label>
-                      <input type="time" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                  </div>
-                  <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">סיום</label>
-                      <input type="time" name="endTime" value={formData.endTime} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                  </div>
+                  <div><label className="block text-sm font-semibold text-gray-700 mb-2">תאריך</label><input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" /></div>
+                  <div><label className="block text-sm font-semibold text-gray-700 mb-2">התחלה</label><input type="time" name="startTime" value={formData.startTime} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" /></div>
+                  <div><label className="block text-sm font-semibold text-gray-700 mb-2">סיום</label><input type="time" name="endTime" value={formData.endTime} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" /></div>
               </div>
           </div>
         </section>
@@ -579,60 +620,56 @@ function ReportForm({ initialData, onSave, onCancel, onPreview }) {
         <section>
           <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.Wrench /></span> ציוד ותקלה</h3>
           <div className="space-y-6">
-              <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">דגם המכשיר</label>
-                  <input type="text" name="deviceModel" value={formData.deviceModel} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white" />
-              </div>
-              <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">תיאור התקלה (תלונת לקוח)</label>
-                  <textarea name="problemDescription" value={formData.problemDescription} onChange={handleChange} rows="2" className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white resize-none" />
-              </div>
-              <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">פירוט העבודה שבוצעה</label>
-                  <textarea name="workDescription" value={formData.workDescription} onChange={handleChange} rows="4" className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white resize-none" />
-              </div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">דגם המכשיר</label><input type="text" name="deviceModel" value={formData.deviceModel} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white" /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">תיאור התקלה</label><textarea name="problemDescription" value={formData.problemDescription} onChange={handleChange} rows="2" className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white resize-none" /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">פירוט העבודה</label><textarea name="workDescription" value={formData.workDescription} onChange={handleChange} rows="4" className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition bg-gray-50 focus:bg-white resize-none" /></div>
           </div>
         </section>
 
         <section>
-          <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.Parts /></span> חלקים וחיוב</h3>
+          <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.Parts /></span> חלקים</h3>
           <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
               <div className="flex gap-4 mb-4 items-end">
-                  <div className="flex-grow">
-                      <label className="text-xs font-bold text-gray-500 mb-1 block">שם חלק</label>
-                      <input type="text" value={newPartName} onChange={(e) => setNewPartName(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:border-blue-500 outline-none" placeholder="לדוגמה: ספק כוח" />
-                  </div>
-                  <button onClick={handleAddPart} className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700 transition shadow-sm"><Icons.Plus /></button>
+                  <div className="flex-grow"><label className="text-xs font-bold text-gray-500 mb-1 block">שם חלק</label><input type="text" value={newPartName} onChange={(e) => setNewPartName(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg text-sm outline-none" /></div>
+                  <button onClick={handleAddPart} className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700"><Icons.Plus /></button>
               </div>
-              
-              <div className="space-y-2">
-                  {formData.partsReplaced && formData.partsReplaced.length > 0 ? (
-                      formData.partsReplaced.map((part, idx) => (
-                          <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 text-sm shadow-sm">
-                              <span className="font-medium text-gray-800">{part.name}</span>
-                              <div className="flex items-center gap-4">
-                                  <button onClick={() => removePart(idx)} className="text-gray-400 hover:text-red-500 transition"><Icons.X /></button>
-                              </div>
-                          </div>
-                      ))
-                  ) : <div className="text-center text-gray-400 text-sm py-2 italic">לא נוספו חלקים</div>}
-              </div>
+              <div className="space-y-2">{formData.partsReplaced && formData.partsReplaced.length > 0 ? (formData.partsReplaced.map((part, idx) => (<div key={idx} className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 text-sm"><span className="font-medium">{part.name}</span><button onClick={() => removePart(idx)} className="text-gray-400 hover:text-red-500"><Icons.X /></button></div>))) : <div className="text-center text-gray-400 text-sm italic">לא נוספו חלקים</div>}</div>
           </div>
         </section>
 
+        <section className="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-2xl border border-emerald-100">
+             <h3 className="text-emerald-700 font-bold mb-4 flex items-center text-lg"><span className="ml-2">✨</span> הודעת סיכום חכמה (AI)</h3>
+             
+             {!aiMessage ? (
+                 <div className="text-center py-4">
+                     <p className="text-gray-500 text-sm mb-4">לאחר מילוי הדוח, לחץ כאן כדי לייצר הודעת וואטסאפ רשמית ללקוח.</p>
+                     <button onClick={handleGenerateAI} disabled={isGenerating} className="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-700 transition flex items-center justify-center mx-auto w-full md:w-auto">
+                         {isGenerating ? '🤖 מנסח הודעה...' : '✨ צור הודעת סיכום ללקוח'}
+                     </button>
+                 </div>
+             ) : (
+                 <div className="space-y-4 animate-fade-in-down">
+                     <textarea value={aiMessage} onChange={(e) => setAiMessage(e.target.value)} className="w-full p-4 border border-emerald-200 rounded-xl bg-white text-gray-800 text-sm leading-relaxed focus:ring-2 focus:ring-emerald-500 outline-none h-32 resize-none" />
+                     <div className="flex gap-3 justify-end">
+                         <button onClick={() => setAiMessage('')} className="text-gray-500 text-sm font-medium hover:text-gray-700">ביטול</button>
+                         <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(aiMessage)}`, '_blank')} className="bg-[#25D366] text-white px-5 py-2.5 rounded-lg font-bold shadow hover:bg-[#20bd5a] flex items-center">
+                             שלח לוואטסאפ <span className="mr-2">✈️</span>
+                         </button>
+                     </div>
+                 </div>
+             )}
+        </section>
+
         <section>
-             <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.FileText /></span> אישור וסיום</h3>
+             <h3 className="text-blue-600 font-bold mb-5 flex items-center border-b pb-2 text-lg"><span className="ml-2"><Icons.FileText /></span> סיום</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div><label className="block text-sm font-semibold text-gray-700 mb-2">שם המטמיע</label><input type="text" name="technicianName" value={formData.technicianName} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" /></div>
                 <div>
-                     <label className="block text-sm font-semibold text-gray-700 mb-2">שם המטמיע</label>
-                     <input type="text" name="technicianName" value={formData.technicianName} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                </div>
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">סטטוס קריאה</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">סטטוס</label>
                     <div className="relative">
                         <select name="status" value={formData.status} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-lg outline-none bg-white appearance-none focus:ring-2 focus:ring-blue-500">
-                            <option value="pending">🟠 בטיפול / פתוח</option>
-                            <option value="completed">🟢 הושלם / סגור</option>
+                            <option value="pending">🟠 בטיפול</option>
+                            <option value="completed">🟢 הושלם</option>
                         </select>
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500"><Icons.Sort /></div>
                     </div>
